@@ -1,3 +1,18 @@
 <Solution>
-  <Project Path="EFCoreSqlPreview/EFCoreSqlPreview.csproj" />
+  <Folder Name="/src/">
+    <Project Path="src/EFCoreSqlPreview.Core/EFCoreSqlPreview.Core.csproj" />
+  </Folder>
+  <Folder Name="/vsix/">
+    <Project Path="EFCoreSqlPreview/EFCoreSqlPreview.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/EFCoreSqlPreview.Core.Tests/EFCoreSqlPreview.Core.Tests.csproj" />
+  </Folder>
+  <Folder Name="/samples/">
+    <Project Path="samples/SampleShop/SampleShop.csproj" />
+  </Folder>
+  <Folder Name="/solution items/">
+    <File Path="Directory.Build.props" />
+    <File Path=".gitignore" />
+  </Folder>
 </Solution>

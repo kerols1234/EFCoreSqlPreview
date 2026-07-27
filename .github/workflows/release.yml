@@ -1,0 +1,147 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# The only write this workflow needs is creating the GitHub Release.
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  CI: 'true'
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Restore
+        run: dotnet restore EFCoreSqlPreview.slnx
+
+      - name: Build (Release)
+        run: >
+          dotnet build EFCoreSqlPreview.slnx
+          --configuration Release
+          --no-restore
+          -p:TreatWarningsAsErrors=false
+
+      # A tag must never ship a broken build. The EndToEnd suite is excluded here
+      # because it is already covered by the CI run on master that produced this commit.
+      - name: Test
+        run: >
+          dotnet test tests/EFCoreSqlPreview.Core.Tests/EFCoreSqlPreview.Core.Tests.csproj
+          --configuration Release
+          --no-build
+          --filter "Category!=EndToEnd"
+          --logger "console;verbosity=normal"
+
+      - name: Verify the VSIX exists
+        shell: pwsh
+        run: |
+          $vsix = 'EFCoreSqlPreview/bin/Release/net8.0-windows8.0/EFCoreSqlPreview.vsix'
+          if (-not (Test-Path $vsix)) {
+            throw "The build did not produce '$vsix'."
+          }
+          $size = [math]::Round((Get-Item $vsix).Length / 1MB, 2)
+          Write-Host "Found $vsix ($size MB)."
+
+      # Body of the release: the CHANGELOG section whose heading contains this tag's
+      # version. Falls back to a short generic note when there is no matching section,
+      # so a tag is never blocked on changelog formatting.
+      - name: Build release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $version = $tag.TrimStart('v')
+          $notes = $null
+
+          if (Test-Path 'CHANGELOG.md') {
+            # Explicit encoding: the file is UTF-8 without a BOM, which Windows PowerShell
+            # would otherwise read as the ANSI code page and mangle.
+            $lines = Get-Content 'CHANGELOG.md' -Encoding utf8
+            $start = -1
+            $end = $lines.Count
+
+            for ($i = 0; $i -lt $lines.Count; $i++) {
+              $line = $lines[$i]
+
+              # Keep-a-Changelog files end with link-reference definitions
+              # ("[1.0.0]: https://..."). They belong to no section, so the last
+              # section stops there rather than absorbing them.
+              if ($start -ge 0 -and $line -match '^\[[^\]]+\]:\s+\S') {
+                $end = $i
+                break
+              }
+
+              if ($line -notmatch '^##\s') { continue }
+
+              if ($start -lt 0) {
+                # Match "## [1.2.3]", "## 1.2.3", "## v1.2.3 - 2026-01-01", ...
+                if ($line -match ('(^|[^0-9.])' + [regex]::Escape($version) + '([^0-9.]|$)')) {
+                  $start = $i + 1
+                }
+              }
+              else {
+                $end = $i
+                break
+              }
+            }
+
+            # $end -gt $start guards the empty-section case: PowerShell ranges run
+            # backwards when the upper bound is the lower one.
+            if ($start -ge 0 -and $end -gt $start) {
+              $notes = ($lines[$start..($end - 1)] -join "`n").Trim()
+            }
+          }
+
+          if ([string]::IsNullOrWhiteSpace($notes)) {
+            $notes = "Release $tag of EF Core SQL Preview."
+            Write-Host "::warning::No CHANGELOG.md section matched version '$version'; using the generic release body."
+          }
+
+          $body = @"
+          $notes
+
+          ---
+
+          **Install:** download ``EFCoreSqlPreview.vsix`` below and double-click it (Visual Studio 2022 17.14 or later).
+          "@
+
+          Set-Content -Path 'release-notes.md' -Value $body -Encoding utf8
+          Write-Host '--- release notes ---'
+          Get-Content 'release-notes.md'
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          body_path: release-notes.md
+          # Any tag carrying a pre-release suffix (v1.0.0-rc.1) is published as one.
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          draft: false
+          fail_on_unmatched_files: true
+          files: EFCoreSqlPreview/bin/Release/net8.0-windows8.0/EFCoreSqlPreview.vsix
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

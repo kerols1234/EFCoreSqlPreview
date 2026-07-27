@@ -361,3 +361,18 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+###############################################################################
+# EF Core SQL Preview
+###############################################################################
+
+# The shipping artifact is built, never committed. bin/ already covers the
+# normal output path; this catches a .vsix copied anywhere else in the tree.
+*.vsix
+
+# OS cruft.
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# MSBuild file logs from the CI build command, when it is run locally.
+build.warnings.log

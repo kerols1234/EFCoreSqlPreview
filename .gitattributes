@@ -61,3 +61,44 @@
 #*.PDF   diff=astextplain
 #*.rtf   diff=astextplain
 #*.RTF   diff=astextplain
+
+###############################################################################
+# EF Core SQL Preview additions
+#
+# The working tree and the index are both LF today; pinning eol=lf keeps that
+# true for a contributor whose core.autocrlf is on, and matches .editorconfig.
+###############################################################################
+*.cs         text eol=lf diff=csharp
+*.csproj     text eol=lf
+*.props      text eol=lf
+*.targets    text eol=lf
+*.slnx       text eol=lf
+*.xaml       text eol=lf
+*.json       text eol=lf
+*.yml        text eol=lf
+*.yaml       text eol=lf
+*.md         text eol=lf
+.editorconfig  text eol=lf
+.gitattributes text eol=lf
+.gitignore     text eol=lf
+
+# Windows-only scripts must keep CRLF or cmd.exe mis-parses them.
+*.cmd        text eol=crlf
+*.bat        text eol=crlf
+*.ps1        text eol=crlf
+
+# Shell scripts must keep LF even on Windows checkouts.
+*.sh         text eol=lf
+
+# Never line-ending-normalise a binary.
+*.vsix       binary
+*.snk        binary
+*.pfx        binary
+*.dll        binary
+*.exe        binary
+*.pdb        binary
+*.png        binary
+*.jpg        binary
+*.jpeg       binary
+*.gif        binary
+*.ico        binary

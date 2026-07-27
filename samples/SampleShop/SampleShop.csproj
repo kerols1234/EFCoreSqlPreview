@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SampleShop</RootNamespace>
+    <AssemblyName>SampleShop</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.10" />
+
+    <!--
+      Plain reference on purpose. The usual metadata VS adds (IncludeAssets without 'compile') would hide
+      IDesignTimeDbContextFactory<T>, and DesignTimeShopDbContextFactory exists precisely to exercise the
+      worker's design-time-factory activation rung.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,45 @@
+<Project>
+
+  <!--
+    Repo-wide defaults.
+
+    Deliberately conservative: the VisualStudio.Extensibility VSIX project brings its own
+    opinionated targets (CreateVsixContainer, CopyLocalLockFileAssemblies, AccelerateBuildsInVisualStudio=false, ...).
+    Anything that could fight those is scoped with a condition instead of being applied globally.
+  -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Never fail a contributor's build on a warning; CI surfaces them without blocking. -->
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+
+    <Deterministic>true</Deterministic>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <EnableDefaultItems>true</EnableDefaultItems>
+
+    <!-- Nothing in this repo is published to NuGet; the shipping artifact is the .vsix. -->
+    <IsPackable>false</IsPackable>
+
+    <RepositoryUrl>https://github.com/kerols1234/EFCoreSqlPreview</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <Authors>kerols1234</Authors>
+    <Product>EF Core SQL Preview</Product>
+  </PropertyGroup>
+
+  <!-- Reproducible builds on CI only: ContinuousIntegrationBuild normalises paths, which hurts local debugging. -->
+  <PropertyGroup Condition="'$(CI)' == 'true' or '$(TF_BUILD)' == 'true' or '$(GITHUB_ACTIONS)' == 'true'">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!--
+    XML docs are part of the Core contract, so they are mandatory there and only there.
+    Turning this on globally would spam CS1591 across the sample and the VSIX.
+  -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'EFCoreSqlPreview.Core'">
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

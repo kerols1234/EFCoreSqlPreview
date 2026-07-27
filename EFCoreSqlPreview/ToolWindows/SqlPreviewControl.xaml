@@ -1,0 +1,353 @@
+<DataTemplate xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+              xmlns:styles="clr-namespace:Microsoft.VisualStudio.Shell;assembly=Microsoft.VisualStudio.Shell.15.0"
+              xmlns:colors="clr-namespace:Microsoft.VisualStudio.PlatformUI;assembly=Microsoft.VisualStudio.Shell.15.0">
+  <Border Background="{DynamicResource {x:Static colors:EnvironmentColors.ToolWindowBackgroundBrushKey}}"
+          TextElement.Foreground="{DynamicResource {x:Static colors:EnvironmentColors.ToolWindowTextBrushKey}}"
+          Padding="8">
+    <Grid>
+      <Grid.Resources>
+        <Style TargetType="TextBox" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.TextBoxStyleKey}}" />
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ButtonStyleKey}}">
+          <Setter Property="MinWidth" Value="80" />
+          <Setter Property="MinHeight" Value="24" />
+          <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+        <Style TargetType="ComboBox" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ComboBoxStyleKey}}" />
+        <Style TargetType="CheckBox" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.CheckBoxStyleKey}}" />
+        <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ProgressBarStyleKey}}" />
+        <Style TargetType="ListView" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ThemedDialogListViewStyleKey}}" />
+        <Style TargetType="ListViewItem" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ThemedDialogListViewItemStyleKey}}" />
+        <Style TargetType="GridViewColumnHeader" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ThemedDialogGridViewColumnHeaderStyleKey}}" />
+        <Style TargetType="TabControl" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ThemedDialogTabControlNavigationStyleKey}}" />
+        <Style TargetType="TabItem" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ThemedDialogTabItemNavigationStyleKey}}" />
+
+        <Style TargetType="TextBlock">
+          <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+          <Setter Property="VerticalAlignment" Value="Center" />
+          <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+
+        <Style x:Key="LabelText" TargetType="TextBlock">
+          <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+          <Setter Property="VerticalAlignment" Value="Center" />
+          <Setter Property="Opacity" Value="0.75" />
+          <Setter Property="Margin" Value="0,0,4,0" />
+        </Style>
+
+        <Style x:Key="MonospaceBox" TargetType="TextBox"
+               BasedOn="{StaticResource {x:Static styles:VsResourceKeys.TextBoxStyleKey}}">
+          <Setter Property="IsReadOnly" Value="True" />
+          <Setter Property="AcceptsReturn" Value="True" />
+          <Setter Property="FontFamily" Value="Consolas" />
+          <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+          <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+          <Setter Property="TextWrapping" Value="NoWrap" />
+        </Style>
+
+        <!-- Remote UI cannot host an IValueConverter, so every conditional visibility is a DataTrigger. -->
+        <Style x:Key="BusyBar" TargetType="ProgressBar"
+               BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ProgressBarStyleKey}}">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Setter Property="Height" Value="3" />
+          <Setter Property="IsIndeterminate" Value="True" />
+          <Setter Property="Margin" Value="0,0,0,6" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding IsBusy}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ErrorBanner" TargetType="Border">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Setter Property="Padding" Value="8,6,8,6" />
+          <Setter Property="Margin" Value="0,0,0,6" />
+          <Setter Property="Background"
+                  Value="{DynamicResource {x:Static colors:EnvironmentColors.ToolWindowContentGridBrushKey}}" />
+          <Setter Property="BorderThickness" Value="1" />
+          <Setter Property="BorderBrush" Value="{DynamicResource {x:Static styles:VsBrushes.GridLineKey}}" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding HasError}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+
+        <Style x:Key="WarningsBlock" TargetType="TextBlock">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Setter Property="TextWrapping" Value="Wrap" />
+          <Setter Property="Margin" Value="0,6,0,0" />
+          <Setter Property="Opacity" Value="0.85" />
+          <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding HasWarnings}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+
+        <Style x:Key="CommandList" TargetType="ListBox">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Setter Property="Width" Value="150" />
+          <Setter Property="Margin" Value="0,0,6,0" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding HasMultipleCommands}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+
+        <Style x:Key="NoVariablesHint" TargetType="TextBlock">
+          <Setter Property="Visibility" Value="Visible" />
+          <Setter Property="TextWrapping" Value="Wrap" />
+          <Setter Property="Opacity" Value="0.75" />
+          <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding HasVariables}" Value="True">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+
+      </Grid.Resources>
+
+      <Grid.RowDefinitions>
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="Auto" />
+        <RowDefinition Height="*" MinHeight="120" />
+        <RowDefinition Height="Auto" />
+      </Grid.RowDefinitions>
+
+      <!-- Row 0: actions, the dialect picker, and the always-visible status line -->
+      <Grid Grid.Row="0" Margin="0,0,0,6">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Grid.Column="0" Orientation="Horizontal">
+          <TextBlock Text="Dialect:" Style="{StaticResource LabelText}" />
+          <ComboBox MinWidth="170"
+                    Margin="0,0,8,0"
+                    ToolTip="Re-runs the query under a different EF Core provider so you can compare dialects."
+                    ItemsSource="{Binding Dialects}"
+                    DisplayMemberPath="DisplayName"
+                    SelectedItem="{Binding SelectedDialect, Mode=TwoWay}"
+                    IsEnabled="{Binding IsIdle}" />
+
+          <Button Content="Re-run"
+                  ToolTip="Runs the preview again using the values in the Variables tab."
+                  Command="{Binding RerunCommand}"
+                  IsEnabled="{Binding IsIdle}" />
+
+          <Button Content="Cancel"
+                  ToolTip="Stops the preview worker."
+                  Command="{Binding CancelCommand}"
+                  IsEnabled="{Binding IsBusy}" />
+
+          <CheckBox Content="Verbose"
+                    VerticalAlignment="Center"
+                    Margin="6,0,8,0"
+                    ToolTip="Include the worker's raw build output on the Diagnostics tab."
+                    IsChecked="{Binding VerboseMode, Mode=TwoWay}" />
+        </StackPanel>
+
+        <TextBlock Grid.Column="1"
+                   TextTrimming="CharacterEllipsis"
+                   ToolTip="{Binding Status}"
+                   Text="{Binding Status}" />
+      </Grid>
+
+      <!-- Row 1: busy indicator -->
+      <ProgressBar Grid.Row="1" Style="{StaticResource BusyBar}" />
+
+      <!-- Row 2: what was resolved -->
+      <WrapPanel Grid.Row="2" Margin="0,0,0,4">
+        <TextBlock Text="Document:" Style="{StaticResource LabelText}" />
+        <TextBlock Text="{Binding DocumentName}" Margin="0,0,12,0" />
+        <TextBlock Text="Project:" Style="{StaticResource LabelText}" />
+        <TextBlock Text="{Binding ProjectName}" Margin="0,0,12,0" />
+        <TextBlock Text="DbContext:" Style="{StaticResource LabelText}" />
+        <TextBlock Text="{Binding ContextType}" Margin="0,0,12,0" />
+        <TextBlock Text="Provider:" Style="{StaticResource LabelText}" />
+        <TextBlock Text="{Binding ProviderText}" Margin="0,0,12,0" />
+        <TextBlock Text="Activation:" Style="{StaticResource LabelText}" />
+        <TextBlock Text="{Binding ActivationStrategy}" />
+      </WrapPanel>
+
+      <!-- Row 3: result shape -->
+      <TextBlock Grid.Row="3"
+                 Margin="0,0,0,6"
+                 TextTrimming="CharacterEllipsis"
+                 ToolTip="{Binding ResultSummary}"
+                 Text="{Binding ResultSummary}" />
+
+      <!-- Row 4: failures, including the SELECT-only refusal -->
+      <Border Grid.Row="4" Style="{StaticResource ErrorBanner}">
+        <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Margin="0" />
+      </Border>
+
+      <!-- Row 5: the detail tabs -->
+      <TabControl Grid.Row="5">
+        <TabItem Header="SQL">
+          <Grid Margin="0,6,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="Auto" />
+              <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <ListBox Grid.Row="0" Grid.RowSpan="2" Grid.Column="0"
+                     Style="{StaticResource CommandList}"
+                     ItemsSource="{Binding Commands}"
+                     DisplayMemberPath="Title"
+                     SelectedItem="{Binding SelectedCommand, Mode=TwoWay}" />
+
+            <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" Margin="0,0,0,4">
+              <Button Content="Copy SQL" Command="{Binding CopySqlCommand}" />
+              <Button Content="Copy all" Command="{Binding CopyAllCommand}"
+                      ToolTip="Copies every command with its parameters as SQL comments." />
+            </StackPanel>
+
+            <TextBox Grid.Row="1" Grid.Column="1"
+                     Style="{StaticResource MonospaceBox}"
+                     Text="{Binding SelectedCommand.Sql, Mode=OneWay}" />
+          </Grid>
+        </TabItem>
+
+        <TabItem Header="Parameters">
+          <Grid Margin="0,6,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0" Margin="0,0,0,4"
+                       Text="{Binding SelectedCommand.ParameterSummary}" />
+
+            <ListView Grid.Row="1" ItemsSource="{Binding SelectedCommand.Parameters}">
+              <ListView.View>
+                <GridView>
+                  <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding Name}" />
+                  <GridViewColumn Header="DB type" Width="110" DisplayMemberBinding="{Binding DbType}" />
+                  <GridViewColumn Header="CLR type" Width="200" DisplayMemberBinding="{Binding ClrType}" />
+                  <GridViewColumn Header="Value" Width="260" DisplayMemberBinding="{Binding Value}" />
+                </GridView>
+              </ListView.View>
+            </ListView>
+          </Grid>
+        </TabItem>
+
+        <TabItem Header="Variables">
+          <Grid Margin="0,6,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+              <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <TextBlock Grid.Row="0"
+                       Style="{StaticResource NoVariablesHint}"
+                       Text="This query does not reference any variable declared outside it." />
+
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+              <ItemsControl ItemsSource="{Binding Variables}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <!-- Styles a row needs live here, not in the outer Grid: a StaticResource that has to
+                         escape a DataTemplate is resolved late and fails loudly if the scope ever moves. -->
+                    <DataTemplate.Resources>
+                      <Style x:Key="VariableName" TargetType="TextBlock">
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="FontFamily" Value="Consolas" />
+                        <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+                        <Style.Triggers>
+                          <DataTrigger Binding="{Binding RequiresValue}" Value="True">
+                            <Setter Property="FontWeight" Value="Bold" />
+                          </DataTrigger>
+                        </Style.Triggers>
+                      </Style>
+                      <Style x:Key="VariableMeta" TargetType="TextBlock">
+                        <Setter Property="VerticalAlignment" Value="Center" />
+                        <Setter Property="Opacity" Value="0.75" />
+                        <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+                        <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+                      </Style>
+                    </DataTemplate.Resources>
+
+                    <Grid Margin="0,0,0,4">
+                      <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="170" />
+                        <ColumnDefinition Width="150" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="120" />
+                      </Grid.ColumnDefinitions>
+
+                      <TextBlock Grid.Column="0"
+                                 Style="{StaticResource VariableName}"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip="{Binding Name}"
+                                 Text="{Binding Name}" />
+
+                      <TextBlock Grid.Column="1"
+                                 Style="{StaticResource VariableMeta}"
+                                 ToolTip="{Binding TypeName}"
+                                 Text="{Binding TypeName}" />
+
+                      <TextBox Grid.Column="2"
+                               MinHeight="22"
+                               FontFamily="Consolas"
+                               VerticalContentAlignment="Center"
+                               ToolTip="A C# expression. It is compiled as part of the preview program."
+                               Text="{Binding ValueExpression, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                      <TextBlock Grid.Column="3"
+                                 Style="{StaticResource VariableMeta}"
+                                 Margin="6,0,0,0"
+                                 ToolTip="{Binding Source}"
+                                 Text="{Binding Source}" />
+                    </Grid>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,6,0,0">
+              <Button Content="Re-run" Command="{Binding RerunCommand}" IsEnabled="{Binding IsIdle}" />
+              <TextBlock Opacity="0.75"
+                         Text="Values in bold were guessed - supply a real one to see the SQL you care about." />
+            </StackPanel>
+          </Grid>
+        </TabItem>
+
+        <TabItem Header="Query">
+          <TextBox Style="{StaticResource MonospaceBox}"
+                   Margin="0,6,0,0"
+                   Text="{Binding QuerySummary, Mode=OneWay}" />
+        </TabItem>
+
+        <TabItem Header="Diagnostics">
+          <TextBox Style="{StaticResource MonospaceBox}"
+                   Margin="0,6,0,0"
+                   Text="{Binding Diagnostics, Mode=OneWay}" />
+        </TabItem>
+
+        <TabItem Header="Generated program">
+          <TextBox Style="{StaticResource MonospaceBox}"
+                   Margin="0,6,0,0"
+                   Text="{Binding GeneratedProgram, Mode=OneWay}" />
+        </TabItem>
+      </TabControl>
+
+      <!-- Row 6: non-fatal notes -->
+      <TextBlock Grid.Row="6" Style="{StaticResource WarningsBlock}" Text="{Binding Warnings}" />
+    </Grid>
+  </Border>
+</DataTemplate>

@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      netstandard2.0 is the contractual target (the analyzer must stay VS-host agnostic).
+      net8.0 is added purely so the VSIX consumes an asset that resolves System.Text.Json
+      from the shared framework instead of packing a second copy into the .vsix.
+    -->
+    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <RootNamespace>EFCoreSqlPreview.Core</RootNamespace>
+    <AssemblyName>EFCoreSqlPreview.Core</AssemblyName>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 4.14.0 ships a real lib/netstandard2.0 and aligns with the 17.14 Extensibility SDK. -->
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.14.0" />
+    <PackageReference Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- netstandard2.0 has no in-box JSON and no init-only support; net8.0 has both. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'netstandard2.0'">
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="EFCoreSqlPreview.Core.Tests" />
+  </ItemGroup>
+
+</Project>

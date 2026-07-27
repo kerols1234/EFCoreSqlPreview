@@ -1,3 +1,4 @@
 {
-  "EFCoreSqlPreview.Command1.DisplayName": "Sample Remote Command"
+  "EFCoreSqlPreview.PreviewSqlCommand.DisplayName": "Preview EF Core SQL",
+  "EFCoreSqlPreview.PreviewSqlCommand.ToolTipText": "Show the SQL EF Core generates for the selected LINQ query, without running your project and without a database"
 }

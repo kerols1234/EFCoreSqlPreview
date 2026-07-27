@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+  workflow_dispatch:
+
+# Nothing in CI writes to the repository.
+permissions:
+  contents: read
+
+# A new push to the same branch supersedes the previous run, except on master
+# where every commit's result is worth keeping.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  # Deterministic paths and reproducible builds; Directory.Build.props keys off this.
+  CI: 'true'
+
+jobs:
+  build:
+    name: Build and test
+    # Windows only: EFCoreSqlPreview.csproj targets net8.0-windows8.0 and produces a .vsix.
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          # 10.0.x builds everything (global.json pins it) and is required by the
+          # worker, a file-based app run with `dotnet run --file`.
+          # 8.0.x supplies the runtime that the net8.0 test assembly executes on.
+          dotnet-version: |
+            8.0.x
+            10.0.x
+
+      - name: Show SDK versions
+        shell: pwsh
+        run: |
+          dotnet --info
+          Write-Host "Resolved SDK for this repository: $(dotnet --version)"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('**/*.csproj', 'Directory.Build.props', 'global.json') }}
+          restore-keys: |
+            nuget-${{ runner.os }}-
+
+      - name: Restore
+        run: dotnet restore EFCoreSqlPreview.slnx
+
+      # TreatWarningsAsErrors stays false (Directory.Build.props): a warning must never
+      # block a contributor. The file logger below makes them impossible to miss instead.
+      - name: Build (Release)
+        run: >
+          dotnet build EFCoreSqlPreview.slnx
+          --configuration Release
+          --no-restore
+          --verbosity normal
+          -p:TreatWarningsAsErrors=false
+          "-flp:LogFile=build.warnings.log;WarningsOnly;Verbosity=normal"
+
+      - name: Report build warnings
+        if: always()
+        shell: pwsh
+        run: |
+          $log = 'build.warnings.log'
+          if (-not (Test-Path $log)) {
+            Write-Host 'No warning log was produced.'
+            return
+          }
+
+          $warnings = Get-Content $log | Where-Object { $_ -match ':\s*warning\s+\w+' } | Sort-Object -Unique
+          if ($warnings.Count -eq 0) {
+            '### Build warnings' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            'None. :tada:' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Write-Host 'Build produced 0 warnings.'
+            return
+          }
+
+          Write-Host "Build produced $($warnings.Count) distinct warning(s):"
+          foreach ($warning in $warnings) {
+            # ::warning:: also surfaces each one in the run's annotation list.
+            Write-Host "::warning::$warning"
+          }
+
+          "### Build warnings ($($warnings.Count))" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          $warnings | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          '```' | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+      # Pull requests skip the EndToEnd suite: those tests really shell out to
+      # `dotnet run --file` against samples/SampleShop, which costs minutes on a cold
+      # runner. master runs everything so the slow path is still covered on every merge.
+      - name: Test (unit, without EndToEnd)
+        if: github.event_name == 'pull_request'
+        run: >
+          dotnet test tests/EFCoreSqlPreview.Core.Tests/EFCoreSqlPreview.Core.Tests.csproj
+          --configuration Release
+          --no-build
+          --filter "Category!=EndToEnd"
+          --logger "trx;LogFileName=unit-tests.trx"
+          --logger "console;verbosity=normal"
+          --results-directory TestResults
+
+      - name: Test (full suite, including EndToEnd)
+        if: github.event_name != 'pull_request'
+        run: >
+          dotnet test tests/EFCoreSqlPreview.Core.Tests/EFCoreSqlPreview.Core.Tests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=all-tests.trx"
+          --logger "console;verbosity=normal"
+          --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload VSIX
+        uses: actions/upload-artifact@v4
+        with:
+          name: EFCoreSqlPreview-vsix
+          path: EFCoreSqlPreview/bin/Release/net8.0-windows8.0/EFCoreSqlPreview.vsix
+          if-no-files-found: error
+          retention-days: 30
