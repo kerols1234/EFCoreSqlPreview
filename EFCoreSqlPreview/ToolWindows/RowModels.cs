@@ -73,6 +73,47 @@ namespace EFCoreSqlPreview.ToolWindows
         /// <summary>A one-line summary of the parameter count, shown above the table.</summary>
         [DataMember]
         public string ParameterSummary { get; init; } = string.Empty;
+
+        /// <summary>The same SQL split into coloured runs, one entry per line.</summary>
+        [DataMember]
+        public ObservableList<SqlLineRow> Lines { get; } = new();
+
+        /// <summary>
+        /// Whether <see cref="Lines"/> was populated. Very large commands are left plain, because every run
+        /// becomes its own element in the remote UI and the cost is paid on each render.
+        /// </summary>
+        [DataMember]
+        public bool IsColorized { get; set; }
+    }
+
+    /// <summary>
+    /// One line of coloured SQL.
+    /// </summary>
+    [DataContract]
+    internal sealed class SqlLineRow
+    {
+        /// <summary>The runs making up the line, in order. Empty for a blank line.</summary>
+        [DataMember]
+        public ObservableList<SqlTokenRow> Tokens { get; } = new();
+    }
+
+    /// <summary>
+    /// One coloured run within a line of SQL.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="Kind"/> travels as a string because the remote UI selects the brush with a
+    /// <c>DataTrigger</c>, and a trigger compares against the serialized value rather than an enum member.
+    /// </remarks>
+    [DataContract]
+    internal sealed class SqlTokenRow
+    {
+        /// <summary>The run's text, verbatim, including any leading whitespace.</summary>
+        [DataMember]
+        public string Text { get; init; } = string.Empty;
+
+        /// <summary>The <see cref="Core.Presentation.SqlTokenKind"/> name.</summary>
+        [DataMember]
+        public string Kind { get; init; } = nameof(Core.Presentation.SqlTokenKind.Plain);
     }
 
     /// <summary>

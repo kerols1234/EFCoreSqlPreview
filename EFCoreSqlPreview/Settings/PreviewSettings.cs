@@ -38,6 +38,12 @@ namespace EFCoreSqlPreview.Settings
         /// </summary>
         public bool VerboseMode { get; set; }
 
+        /// <summary>
+        /// Whether the SQL tab opens on the plain, selectable text rather than the coloured view. Off by
+        /// default; on for anyone who would rather drag-select the SQL than look at it.
+        /// </summary>
+        public bool ShowPlainSql { get; set; }
+
         /// <summary>The extension's private data directory under <c>%LOCALAPPDATA%</c>.</summary>
         /// <remarks>Declared before <see cref="SettingsPath"/>: static initializers run in declaration order.</remarks>
         public static string RootDirectory { get; } = Path.Combine(

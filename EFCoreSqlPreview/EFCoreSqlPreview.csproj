@@ -8,9 +8,9 @@
     <NeutralLanguage>en-US</NeutralLanguage>
 
     <!-- The VSIX version is taken from the assembly version, so a release tag moves both together. -->
-    <Version>1.0.1</Version>
-    <AssemblyVersion>1.0.1</AssemblyVersion>
-    <FileVersion>1.0.1</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0</AssemblyVersion>
+    <FileVersion>1.1.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -21,6 +21,16 @@
   <ItemGroup>
     <!-- Core multi-targets; this resolves its net8.0 asset, so System.Text.Json comes from the shared framework. -->
     <ProjectReference Include="..\src\EFCoreSqlPreview.Core\EFCoreSqlPreview.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Content is packaged into the .vsix at this relative path by the Extensibility build targets, which is
+      exactly what ExtensionMetadata.Icon and .PreviewImage are resolved against.
+      Regenerate the artwork by running assets/GenerateIcons.cs as a file-based app.
+    -->
+    <Content Include="Resources\icon.png" />
+    <Content Include="Resources\preview.png" />
   </ItemGroup>
 
   <ItemGroup>

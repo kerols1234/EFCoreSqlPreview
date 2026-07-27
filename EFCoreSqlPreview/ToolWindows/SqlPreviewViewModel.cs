@@ -3,6 +3,7 @@ using System.Text;
 using EFCoreSqlPreview.Core.Analysis;
 using EFCoreSqlPreview.Core.Execution;
 using EFCoreSqlPreview.Core.Generation;
+using EFCoreSqlPreview.Core.Presentation;
 using EFCoreSqlPreview.Core.Projects;
 using EFCoreSqlPreview.Services;
 using EFCoreSqlPreview.Settings;
@@ -55,10 +56,13 @@ namespace EFCoreSqlPreview.ToolWindows
         private bool hasWarnings;
         private bool hasError;
         private bool hasMultipleCommands;
+        private bool hasResult;
         private bool hasVariables;
         private bool verboseMode;
         private CommandRow? selectedCommand;
         private DialectOption? selectedDialect;
+        private bool showPlainSql;
+        private bool showColorizedSql;
 
         /// <summary>Creates the view model.</summary>
         /// <param name="runner">Runs the analyse-generate-execute pipeline.</param>
@@ -68,6 +72,7 @@ namespace EFCoreSqlPreview.ToolWindows
             this.runner = runner;
             this.settings = settings;
             this.verboseMode = settings.VerboseMode;
+            this.showPlainSql = settings.ShowPlainSql;
 
             this.RerunCommand = new AsyncCommand((_, _) => this.RunAsync());
             this.CancelCommand = new AsyncCommand((_, _) => this.CancelRunAsync());
@@ -79,6 +84,16 @@ namespace EFCoreSqlPreview.ToolWindows
             this.CopyAllCommand = new AsyncCommand((_, _) =>
             {
                 this.CopyAll();
+                return Task.CompletedTask;
+            });
+            this.CopyErrorCommand = new AsyncCommand((_, _) =>
+            {
+                this.CopyError();
+                return Task.CompletedTask;
+            });
+            this.CopyDiagnosticsCommand = new AsyncCommand((_, _) =>
+            {
+                this.ReportCopy(ClipboardWriter.TrySetText(this.Diagnostics), "Diagnostics");
                 return Task.CompletedTask;
             });
 
@@ -224,6 +239,14 @@ namespace EFCoreSqlPreview.ToolWindows
             private set => this.SetProperty(ref this.hasMultipleCommands, value);
         }
 
+        /// <summary>Whether the last run produced at least one command, which is what colours the result line.</summary>
+        [DataMember]
+        public bool HasResult
+        {
+            get => this.hasResult;
+            private set => this.SetProperty(ref this.hasResult, value);
+        }
+
         /// <summary>Whether the query referenced any variable declared outside it.</summary>
         [DataMember]
         public bool HasVariables
@@ -256,7 +279,43 @@ namespace EFCoreSqlPreview.ToolWindows
         public CommandRow? SelectedCommand
         {
             get => this.selectedCommand;
-            set => this.SetProperty(ref this.selectedCommand, value);
+            set
+            {
+                if (this.SetProperty(ref this.selectedCommand, value))
+                {
+                    this.RefreshSqlView();
+                }
+            }
+        }
+
+        /// <summary>
+        /// Whether the SQL tab shows the plain, selectable text instead of the coloured view.
+        /// </summary>
+        /// <remarks>
+        /// The coloured view is built from many small elements, none of which can be selected with the mouse,
+        /// so the plain view has to stay reachable for anyone who wants to drag-select part of a statement.
+        /// </remarks>
+        [DataMember]
+        public bool ShowPlainSql
+        {
+            get => this.showPlainSql;
+            set
+            {
+                if (this.SetProperty(ref this.showPlainSql, value))
+                {
+                    this.settings.ShowPlainSql = value;
+                    this.settings.Save();
+                    this.RefreshSqlView();
+                }
+            }
+        }
+
+        /// <summary>Whether the coloured SQL view is the one currently on screen.</summary>
+        [DataMember]
+        public bool ShowColorizedSql
+        {
+            get => this.showColorizedSql;
+            private set => this.SetProperty(ref this.showColorizedSql, value);
         }
 
         /// <summary>The free variables the query referenced, with editable values.</summary>
@@ -307,6 +366,14 @@ namespace EFCoreSqlPreview.ToolWindows
         /// <summary>Copies the SQL and parameters of every command to the clipboard.</summary>
         [DataMember]
         public AsyncCommand CopyAllCommand { get; }
+
+        /// <summary>Copies the error banner, with the diagnostics that explain it, to the clipboard.</summary>
+        [DataMember]
+        public AsyncCommand CopyErrorCommand { get; }
+
+        /// <summary>Copies the Diagnostics tab to the clipboard.</summary>
+        [DataMember]
+        public AsyncCommand CopyDiagnosticsCommand { get; }
 
         /// <summary>
         /// Accepts a new selection from the editor command and starts a preview for it.
@@ -370,6 +437,31 @@ namespace EFCoreSqlPreview.ToolWindows
         {
             var sql = this.SelectedCommand?.Sql ?? this.Commands.FirstOrDefault()?.Sql;
             this.ReportCopy(ClipboardWriter.TrySetText(sql), "SQL");
+        }
+
+        /// <summary>
+        /// Copies the failure as a self-contained report.
+        /// </summary>
+        /// <remarks>
+        /// The banner alone is rarely enough to act on or to paste into an issue, so the compiler diagnostics
+        /// and any warnings go with it - which is exactly the material the troubleshooting section asks for.
+        /// </remarks>
+        private void CopyError()
+        {
+            var builder = new StringBuilder();
+            builder.AppendLine(this.ErrorMessage.Length > 0 ? this.ErrorMessage : "(no error message)");
+
+            if (this.HasWarnings)
+            {
+                builder.AppendLine().AppendLine("--- warnings ---").AppendLine(this.Warnings);
+            }
+
+            if (this.Diagnostics.Length > 0)
+            {
+                builder.AppendLine().AppendLine("--- diagnostics ---").AppendLine(this.Diagnostics);
+            }
+
+            this.ReportCopy(ClipboardWriter.TrySetText(builder.ToString().TrimEnd()), "Error");
         }
 
         private void CopyAll()
@@ -630,12 +722,57 @@ namespace EFCoreSqlPreview.ToolWindows
                     Value = p.IsNull ? "NULL" : p.Value ?? string.Empty,
                 }));
 
+                Colorize(row);
                 rows.Add(row);
             }
 
             this.Commands.AddRange(rows);
             this.HasMultipleCommands = rows.Count > 1;
+            this.HasResult = rows.Count > 0;
             this.SelectedCommand = rows.FirstOrDefault();
+        }
+
+        /// <summary>
+        /// Recomputes which of the two SQL views is showing.
+        /// </summary>
+        /// <remarks>
+        /// This is a single bool rather than a pair of conditions evaluated in XAML because the remote UI has
+        /// no converters, and a <c>MultiDataTrigger</c> spanning the selected command and a user preference is
+        /// harder to follow than deriving it once here.
+        /// </remarks>
+        private void RefreshSqlView()
+            => this.ShowColorizedSql = !this.ShowPlainSql && this.SelectedCommand?.IsColorized == true;
+
+        /// <summary>Largest command the tokenized view is built for.</summary>
+        /// <remarks>
+        /// Every run crosses the remote-UI boundary as its own element. A command this size is already past
+        /// the point of being read on screen, so it keeps the plain view rather than paying that cost.
+        /// </remarks>
+        private const int ColorizeCharacterLimit = 40_000;
+
+        /// <summary>Fills a row's coloured runs, leaving it plain when the command is too large.</summary>
+        /// <param name="row">The row to populate.</param>
+        private static void Colorize(CommandRow row)
+        {
+            if (row.Sql.Length > ColorizeCharacterLimit)
+            {
+                row.IsColorized = false;
+                return;
+            }
+
+            foreach (var line in SqlTokenizer.Tokenize(row.Sql))
+            {
+                var lineRow = new SqlLineRow();
+                lineRow.Tokens.AddRange(line.Select(token => new SqlTokenRow
+                {
+                    Text = token.Text,
+                    Kind = token.Kind.ToString(),
+                }));
+
+                row.Lines.Add(lineRow);
+            }
+
+            row.IsColorized = true;
         }
 
         private void ApplyVariables(QueryAnalysisResult? analysis)

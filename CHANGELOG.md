@@ -9,6 +9,30 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Nothing yet.
 
+## [1.1.0] - 2026-07-28
+
+### Added
+
+- **Syntax-coloured SQL.** The SQL tab now colours keywords, functions, quoted identifiers, string and numeric
+  literals, parameters, comments and operators. A new `SqlTokenizer` in `EFCoreSqlPreview.Core` does the
+  lexing; it copes with SQL Server brackets, PostgreSQL double quotes and MySQL backticks, and a round-trip
+  test asserts that colouring never alters the text.
+- **A "Plain text" toggle** on the SQL tab. The coloured view is built from one element per run and cannot be
+  drag-selected, so the plain, selectable view stays one click away. The choice is remembered. Commands over
+  40,000 characters stay plain regardless, because every run crosses the remote-UI boundary individually.
+- **Copy error.** The error banner has a Copy button that puts the message, the warnings and the diagnostics on
+  the clipboard as one report, and the message itself is now selectable text rather than a label.
+- **Copy diagnostics** button on the Diagnostics tab, with the Verbose toggle moved there from the toolbar.
+- **Colour throughout the window.** Resolved values (project, DbContext, provider, activation) are accented,
+  the result line turns green once a run produces SQL, the error banner is red, warnings are amber and
+  selectable, parameter names and values are tinted to match the colours they carry in the SQL.
+- **An extension icon and preview image**, shown in the Extensions manager and the marketplace listing.
+  Reproducible from `assets/GenerateIcons.cs`.
+
+### Changed
+
+- Test suite is now **814 tests** (805 fast plus 9 end-to-end), up from 771.
+
 ## [1.0.1] - 2026-07-28
 
 Fixes found by running 1.0.0 against a real clean-architecture solution.
@@ -86,7 +110,7 @@ Initial release.
   `DotnetPath`, `ProviderOverride`, `VerboseMode`.
 - **`samples/SampleShop`** — a net10.0 EF Core 10 fixture with owned types, value-converted collections,
   two-way navigations, a design-time factory, custom queryable extensions and seven ready-to-select queries.
-- **771 tests**: 762 fast unit tests plus 9 end-to-end tests that really run `dotnet run --file` against the
+- **766 tests**: 757 fast unit tests plus 9 end-to-end tests that really run `dotnet run --file` against the
   sample and assert on the SQL that comes back.
 
 ### Known limitations

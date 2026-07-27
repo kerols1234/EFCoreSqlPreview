@@ -22,10 +22,79 @@
         <Style TargetType="TabControl" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ThemedDialogTabControlNavigationStyleKey}}" />
         <Style TargetType="TabItem" BasedOn="{StaticResource {x:Static styles:VsResourceKeys.ThemedDialogTabItemNavigationStyleKey}}" />
 
+        <!--
+          Palette. Fixed colours rather than theme resources: Visual Studio exposes no environment brushes for
+          SQL syntax, and the remote UI cannot run a converter to choose a palette at runtime. Every value was
+          picked to stay legible on both the light and the dark theme, which costs some vividness next to a
+          theme-specific set.
+
+          Only the three below are resources. The SQL syntax colours are written as literals inside the token
+          DataTemplate, because a StaticResource referenced from a nested DataTemplate resolves late and throws
+          at runtime. They are, for reference:
+            keyword #3F8FD8   function #A96FD8   identifier #1F9E86   string  #C0703C
+            number  #4E9E3E   parameter #CC5FA8  comment    #7A8F72   operator #8A8A8A
+            warning #C08A1E
+        -->
+        <SolidColorBrush x:Key="ErrorBrush" Color="#D64545" />
+        <SolidColorBrush x:Key="SuccessBrush" Color="#3E9B4F" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#3F8FD8" />
+
         <Style TargetType="TextBlock">
           <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
           <Setter Property="VerticalAlignment" Value="Center" />
           <Setter Property="Margin" Value="0,0,6,0" />
+        </Style>
+
+        <!-- A value the tool resolved for you, as opposed to the label naming it. -->
+        <Style x:Key="ResolvedValue" TargetType="TextBlock">
+          <Setter Property="VerticalAlignment" Value="Center" />
+          <Setter Property="Margin" Value="0,0,12,0" />
+          <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+          <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Green only once a run has actually produced SQL, so the colour means something. -->
+        <Style x:Key="ResultLine" TargetType="TextBlock">
+          <Setter Property="VerticalAlignment" Value="Center" />
+          <Setter Property="Margin" Value="0,0,0,6" />
+          <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+          <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding HasResult}" Value="True">
+              <Setter Property="Foreground" Value="{StaticResource SuccessBrush}" />
+              <Setter Property="FontWeight" Value="SemiBold" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+
+        <Style x:Key="ColorizedSql" TargetType="ScrollViewer">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+          <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+          <Setter Property="Background"
+                  Value="{DynamicResource {x:Static colors:EnvironmentColors.ToolWindowContentGridBrushKey}}" />
+          <Setter Property="Padding" Value="6,4,6,4" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding ShowColorizedSql}" Value="True">
+              <Setter Property="Visibility" Value="Visible" />
+            </DataTrigger>
+          </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PlainSql" TargetType="TextBox"
+               BasedOn="{StaticResource {x:Static styles:VsResourceKeys.TextBoxStyleKey}}">
+          <Setter Property="IsReadOnly" Value="True" />
+          <Setter Property="AcceptsReturn" Value="True" />
+          <Setter Property="FontFamily" Value="Consolas" />
+          <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+          <Setter Property="HorizontalScrollBarVisibility" Value="Auto" />
+          <Setter Property="TextWrapping" Value="NoWrap" />
+          <Setter Property="Visibility" Value="Visible" />
+          <Style.Triggers>
+            <DataTrigger Binding="{Binding ShowColorizedSql}" Value="True">
+              <Setter Property="Visibility" Value="Collapsed" />
+            </DataTrigger>
+          </Style.Triggers>
         </Style>
 
         <Style x:Key="LabelText" TargetType="TextBlock">
@@ -65,8 +134,8 @@
           <Setter Property="Margin" Value="0,0,0,6" />
           <Setter Property="Background"
                   Value="{DynamicResource {x:Static colors:EnvironmentColors.ToolWindowContentGridBrushKey}}" />
-          <Setter Property="BorderThickness" Value="1" />
-          <Setter Property="BorderBrush" Value="{DynamicResource {x:Static styles:VsBrushes.GridLineKey}}" />
+          <Setter Property="BorderThickness" Value="1,1,1,1" />
+          <Setter Property="BorderBrush" Value="{StaticResource ErrorBrush}" />
           <Style.Triggers>
             <DataTrigger Binding="{Binding HasError}" Value="True">
               <Setter Property="Visibility" Value="Visible" />
@@ -74,12 +143,37 @@
           </Style.Triggers>
         </Style>
 
-        <Style x:Key="WarningsBlock" TargetType="TextBlock">
-          <Setter Property="Visibility" Value="Collapsed" />
+        <!--
+          The message is a read-only TextBox rather than a TextBlock purely so it can be selected with the
+          mouse. A failure is the thing people most want to paste into a search box or an issue, and a
+          TextBlock offers no way to get the text out at all.
+        -->
+        <Style x:Key="ErrorText" TargetType="TextBox"
+               BasedOn="{StaticResource {x:Static styles:VsResourceKeys.TextBoxStyleKey}}">
+          <Setter Property="IsReadOnly" Value="True" />
+          <Setter Property="AcceptsReturn" Value="True" />
           <Setter Property="TextWrapping" Value="Wrap" />
+          <Setter Property="BorderThickness" Value="0" />
+          <Setter Property="Background" Value="Transparent" />
+          <Setter Property="Padding" Value="0" />
+          <Setter Property="MaxHeight" Value="140" />
+          <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+          <Setter Property="Foreground" Value="{StaticResource ErrorBrush}" />
+        </Style>
+
+        <Style x:Key="WarningsBlock" TargetType="TextBox"
+               BasedOn="{StaticResource {x:Static styles:VsResourceKeys.TextBoxStyleKey}}">
+          <Setter Property="Visibility" Value="Collapsed" />
+          <Setter Property="IsReadOnly" Value="True" />
+          <Setter Property="AcceptsReturn" Value="True" />
+          <Setter Property="TextWrapping" Value="Wrap" />
+          <Setter Property="BorderThickness" Value="0" />
+          <Setter Property="Background" Value="Transparent" />
+          <Setter Property="Padding" Value="0" />
+          <Setter Property="MaxHeight" Value="90" />
+          <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
           <Setter Property="Margin" Value="0,6,0,0" />
-          <Setter Property="Opacity" Value="0.85" />
-          <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+          <Setter Property="Foreground" Value="#C08A1E" />
           <Style.Triggers>
             <DataTrigger Binding="{Binding HasWarnings}" Value="True">
               <Setter Property="Visibility" Value="Visible" />
@@ -149,11 +243,6 @@
                   Command="{Binding CancelCommand}"
                   IsEnabled="{Binding IsBusy}" />
 
-          <CheckBox Content="Verbose"
-                    VerticalAlignment="Center"
-                    Margin="6,0,8,0"
-                    ToolTip="Include the worker's raw build output on the Diagnostics tab."
-                    IsChecked="{Binding VerboseMode, Mode=TwoWay}" />
         </StackPanel>
 
         <TextBlock Grid.Column="1"
@@ -168,27 +257,42 @@
       <!-- Row 2: what was resolved -->
       <WrapPanel Grid.Row="2" Margin="0,0,0,4">
         <TextBlock Text="Document:" Style="{StaticResource LabelText}" />
-        <TextBlock Text="{Binding DocumentName}" Margin="0,0,12,0" />
+        <TextBlock Text="{Binding DocumentName}" Style="{StaticResource ResolvedValue}" />
         <TextBlock Text="Project:" Style="{StaticResource LabelText}" />
-        <TextBlock Text="{Binding ProjectName}" Margin="0,0,12,0" />
+        <TextBlock Text="{Binding ProjectName}" Style="{StaticResource ResolvedValue}" />
         <TextBlock Text="DbContext:" Style="{StaticResource LabelText}" />
-        <TextBlock Text="{Binding ContextType}" Margin="0,0,12,0" />
+        <TextBlock Text="{Binding ContextType}" Style="{StaticResource ResolvedValue}" />
         <TextBlock Text="Provider:" Style="{StaticResource LabelText}" />
-        <TextBlock Text="{Binding ProviderText}" Margin="0,0,12,0" />
+        <TextBlock Text="{Binding ProviderText}" Style="{StaticResource ResolvedValue}" />
         <TextBlock Text="Activation:" Style="{StaticResource LabelText}" />
-        <TextBlock Text="{Binding ActivationStrategy}" />
+        <TextBlock Text="{Binding ActivationStrategy}" Style="{StaticResource ResolvedValue}" />
       </WrapPanel>
 
       <!-- Row 3: result shape -->
       <TextBlock Grid.Row="3"
-                 Margin="0,0,0,6"
-                 TextTrimming="CharacterEllipsis"
+                 Style="{StaticResource ResultLine}"
                  ToolTip="{Binding ResultSummary}"
                  Text="{Binding ResultSummary}" />
 
       <!-- Row 4: failures, including the SELECT-only refusal -->
       <Border Grid.Row="4" Style="{StaticResource ErrorBanner}">
-        <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Margin="0" />
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="Auto" />
+          </Grid.ColumnDefinitions>
+
+          <TextBox Grid.Column="0"
+                   Style="{StaticResource ErrorText}"
+                   Text="{Binding ErrorMessage, Mode=OneWay}" />
+
+          <Button Grid.Column="1"
+                  Content="Copy error"
+                  Margin="8,0,0,0"
+                  VerticalAlignment="Top"
+                  ToolTip="Copies the message with the warnings and diagnostics that explain it."
+                  Command="{Binding CopyErrorCommand}" />
+        </Grid>
       </Border>
 
       <!-- Row 5: the detail tabs -->
@@ -214,10 +318,88 @@
               <Button Content="Copy SQL" Command="{Binding CopySqlCommand}" />
               <Button Content="Copy all" Command="{Binding CopyAllCommand}"
                       ToolTip="Copies every command with its parameters as SQL comments." />
+              <CheckBox Content="Plain text"
+                        VerticalAlignment="Center"
+                        Margin="6,0,0,0"
+                        ToolTip="Shows the SQL as selectable plain text instead of the coloured view."
+                        IsChecked="{Binding ShowPlainSql, Mode=TwoWay}" />
             </StackPanel>
 
+            <!--
+              Two views of the same command, one visible at a time. The coloured one is built from a TextBlock
+              per run, which cannot be selected with the mouse; the plain one is the selectable fallback and is
+              also what very large commands fall back to.
+            -->
+            <ScrollViewer Grid.Row="1" Grid.Column="1" Style="{StaticResource ColorizedSql}">
+              <ItemsControl ItemsSource="{Binding SelectedCommand.Lines}">
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal">
+                      <!-- Zero-width space: gives a blank line the font's full height without adding width. -->
+                      <TextBlock Text="&#x200B;" FontFamily="Consolas" Margin="0" VerticalAlignment="Top" />
+                      <ItemsControl ItemsSource="{Binding Tokens}">
+                        <ItemsControl.ItemsPanel>
+                          <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                          </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate>
+                            <!-- Colours are literals, not StaticResource keys. This template is nested two
+                                 levels deep, and a StaticResource that has to escape a DataTemplate resolves
+                                 late and throws at runtime - which an embedded XAML resource would not catch
+                                 until the tool window opened. -->
+                            <DataTemplate.Resources>
+                              <Style x:Key="SqlTokenText" TargetType="TextBlock">
+                                <Setter Property="FontFamily" Value="Consolas" />
+                                <Setter Property="Margin" Value="0" />
+                                <Setter Property="VerticalAlignment" Value="Top" />
+                                <Setter Property="Foreground"
+                                        Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
+                                <Style.Triggers>
+                                  <DataTrigger Binding="{Binding Kind}" Value="Keyword">
+                                    <Setter Property="Foreground" Value="#3F8FD8" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Kind}" Value="Function">
+                                    <Setter Property="Foreground" Value="#A96FD8" />
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Kind}" Value="Identifier">
+                                    <Setter Property="Foreground" Value="#1F9E86" />
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Kind}" Value="String">
+                                    <Setter Property="Foreground" Value="#C0703C" />
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Kind}" Value="Number">
+                                    <Setter Property="Foreground" Value="#4E9E3E" />
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Kind}" Value="Parameter">
+                                    <Setter Property="Foreground" Value="#CC5FA8" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Kind}" Value="Comment">
+                                    <Setter Property="Foreground" Value="#7A8F72" />
+                                    <Setter Property="FontStyle" Value="Italic" />
+                                  </DataTrigger>
+                                  <DataTrigger Binding="{Binding Kind}" Value="Operator">
+                                    <Setter Property="Foreground" Value="#8A8A8A" />
+                                  </DataTrigger>
+                                </Style.Triggers>
+                              </Style>
+                            </DataTemplate.Resources>
+
+                            <TextBlock Text="{Binding Text}" Style="{StaticResource SqlTokenText}" />
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+
             <TextBox Grid.Row="1" Grid.Column="1"
-                     Style="{StaticResource MonospaceBox}"
+                     Style="{StaticResource PlainSql}"
                      Text="{Binding SelectedCommand.Sql, Mode=OneWay}" />
           </Grid>
         </TabItem>
@@ -235,10 +417,31 @@
             <ListView Grid.Row="1" ItemsSource="{Binding SelectedCommand.Parameters}">
               <ListView.View>
                 <GridView>
-                  <GridViewColumn Header="Name" Width="180" DisplayMemberBinding="{Binding Name}" />
+                  <!-- Name and value carry the same colours the SQL uses, so a parameter can be matched
+                       between the two tabs by colour as well as by name. -->
+                  <GridViewColumn Header="Name" Width="180">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Name}"
+                                   FontFamily="Consolas"
+                                   FontWeight="SemiBold"
+                                   Margin="0"
+                                   Foreground="#CC5FA8" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
                   <GridViewColumn Header="DB type" Width="110" DisplayMemberBinding="{Binding DbType}" />
                   <GridViewColumn Header="CLR type" Width="200" DisplayMemberBinding="{Binding ClrType}" />
-                  <GridViewColumn Header="Value" Width="260" DisplayMemberBinding="{Binding Value}" />
+                  <GridViewColumn Header="Value" Width="260">
+                    <GridViewColumn.CellTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Value}"
+                                   FontFamily="Consolas"
+                                   Margin="0"
+                                   Foreground="#C0703C" />
+                      </DataTemplate>
+                    </GridViewColumn.CellTemplate>
+                  </GridViewColumn>
                 </GridView>
               </ListView.View>
             </ListView>
@@ -269,8 +472,10 @@
                         <Setter Property="FontFamily" Value="Consolas" />
                         <Setter Property="Foreground" Value="{DynamicResource {x:Static styles:VsBrushes.WindowTextKey}}" />
                         <Style.Triggers>
+                          <!-- Amber rather than red: a guessed value is a prompt to check, not a failure. -->
                           <DataTrigger Binding="{Binding RequiresValue}" Value="True">
                             <Setter Property="FontWeight" Value="Bold" />
+                            <Setter Property="Foreground" Value="#C08A1E" />
                           </DataTrigger>
                         </Style.Triggers>
                       </Style>
@@ -334,9 +539,25 @@
         </TabItem>
 
         <TabItem Header="Diagnostics">
-          <TextBox Style="{StaticResource MonospaceBox}"
-                   Margin="0,6,0,0"
-                   Text="{Binding Diagnostics, Mode=OneWay}" />
+          <Grid Margin="0,6,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto" />
+              <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,4">
+              <Button Content="Copy diagnostics" Command="{Binding CopyDiagnosticsCommand}" />
+              <CheckBox Content="Verbose"
+                        VerticalAlignment="Center"
+                        Margin="6,0,0,0"
+                        ToolTip="Include the worker's raw build output."
+                        IsChecked="{Binding VerboseMode, Mode=TwoWay}" />
+            </StackPanel>
+
+            <TextBox Grid.Row="1"
+                     Style="{StaticResource MonospaceBox}"
+                     Text="{Binding Diagnostics, Mode=OneWay}" />
+          </Grid>
         </TabItem>
 
         <TabItem Header="Generated program">
@@ -347,7 +568,7 @@
       </TabControl>
 
       <!-- Row 6: non-fatal notes -->
-      <TextBlock Grid.Row="6" Style="{StaticResource WarningsBlock}" Text="{Binding Warnings}" />
+      <TextBox Grid.Row="6" Style="{StaticResource WarningsBlock}" Text="{Binding Warnings, Mode=OneWay}" />
     </Grid>
   </Border>
 </DataTemplate>

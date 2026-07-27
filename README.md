@@ -1,6 +1,10 @@
+<img src="assets/logo.png" alt="" width="96" align="left" hspace="12" />
+
 # EF Core SQL Preview
 
 **Select a LINQ query in the Visual Studio editor and see the SQL EF Core will generate for it — without running your app and without a database.**
+
+<br clear="left" />
 
 [![Build](https://img.shields.io/github/actions/workflow/status/kerols1234/EFCoreSqlPreview/ci.yml?branch=master&label=build&logo=github)](https://github.com/kerols1234/EFCoreSqlPreview/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
@@ -297,14 +301,25 @@ You do not have to select the query precisely. The analyzer normalises whatever 
 | --- | --- |
 | Header line | Document, project, `DbContext` type, detected provider, activation strategy |
 | Result line | e.g. `Result: await ….ToListAsync() -> List<ProductDto> (DTO projection, async)` |
-| **SQL** | The command text, with a command selector when a split query issued several |
+| **SQL** | The command text, syntax-coloured, with a command selector when a split query issued several |
 | **Parameters** | Name, DB type, CLR type, value, per command |
 | **Variables** | Every free variable, its type, where its value came from, and an editable value box |
 | **Query** | The normalised query the preview actually ran |
 | **Diagnostics** | Analyzer findings, plus compiler errors remapped onto your document |
 | **Generated program** | The full worker source, for when you want to see exactly what ran |
 | Dialect picker | `Auto (detect from project)`, SQL Server, PostgreSQL, SQLite, MySQL (Pomelo), Oracle |
-| Buttons | Re-run, Cancel, Copy SQL, Copy all, Verbose |
+| Buttons | Re-run, Cancel, Copy SQL, Copy all, Copy error, Copy diagnostics |
+
+Colour carries meaning rather than decoration: resolved values are accented, the result line turns green once a
+run produces SQL, the error banner is red, and a variable whose value had to be guessed is amber — that is the
+one you probably want to edit. Parameters are tinted the same colour in the SQL and in the table, so you can
+match them by eye.
+
+The coloured SQL view is made of many small elements and cannot be drag-selected. **Plain text** on the SQL tab
+switches to a selectable view, and the choice is remembered. Very large commands stay plain regardless.
+
+Anything that can fail can be copied: **Copy error** puts the message, the warnings and the diagnostics on the
+clipboard as a single report, which is what to paste into an issue.
 
 ---
 
@@ -445,7 +460,8 @@ Settings live in a small JSON file, created on first save:
   "TimeoutSeconds": 120,          // 10-900. How long the worker may run before its process tree is killed.
   "DotnetPath": "",               // Absolute path to a dotnet.exe. Empty = whatever PATH resolves.
   "ProviderOverride": "Unknown",  // Unknown | SqlServer | PostgreSql | Sqlite | MySql | Oracle
-  "VerboseMode": false            // Also show the worker's raw stdout/stderr on the Diagnostics tab.
+  "VerboseMode": false,           // Also show the worker's raw stdout/stderr on the Diagnostics tab.
+  "ShowPlainSql": false           // Open the SQL tab on the selectable plain view instead of the coloured one.
 }
 ```
 
@@ -458,6 +474,7 @@ always safe to delete.
 | `DotnetPath` | Several SDKs side by side and the one on `PATH` is older than 10.0. Point it at a specific `dotnet.exe`. |
 | `ProviderOverride` | Pins the dialect picker's starting selection across sessions. Equivalent to choosing that dialect in the picker, which also writes this value. |
 | `VerboseMode` | Turn on before filing a bug: the Diagnostics tab then includes the full build log. |
+| `ShowPlainSql` | Opens the SQL tab on the selectable plain view. The **Plain text** checkbox writes this too. |
 
 ### Dialect picker
 
@@ -675,7 +692,7 @@ couple of seconds. **Use logging when** you need the definitive SQL a real execu
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, how to build and test,
 and how to debug the extension in the Visual Studio experimental instance.
 
-The test suite is **771 tests** — 762 fast unit tests (under a second) plus 9 end-to-end tests that really run
+The test suite is **814 tests** — 805 fast unit tests (under a second) plus 9 end-to-end tests that really run
 `dotnet run --file` against `samples/SampleShop`:
 
 ```powershell

@@ -22,6 +22,8 @@ namespace EFCoreSqlPreview
                 description: "Shows the SQL EF Core generates for a selected LINQ query, without running your project and without a database.")
             {
                 Preview = false,
+                Icon = @"Resources\icon.png",
+                PreviewImage = @"Resources\preview.png",
                 MoreInfo = "https://github.com/kerols1234/EFCoreSqlPreview",
                 Tags = ["entity framework", "ef core", "sql", "linq", "orm", "database"],
                 InstallationTargetVersion = "[17.14,)",
