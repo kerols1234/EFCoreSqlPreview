@@ -531,6 +531,84 @@ public class Svc
         AssertParsesCleanly(worker);
     }
 
+    /// <summary>
+    /// Clean-architecture handlers inject <c>IApplicationDbContext</c> rather than the context, which is the
+    /// shape that first surfaced this: without the hint, discovery offered every framework base class the real
+    /// context happened to derive from and refused to choose.
+    /// </summary>
+    [Fact]
+    public void A_context_reached_through_an_interface_passes_that_interface_to_discovery()
+    {
+        const string document = """
+using Microsoft.EntityFrameworkCore;
+
+namespace Demo;
+
+public class Handler(IApplicationDbContext context)
+{
+    public Task<List<Product>> Go() => context.Products.ToListAsync();
+}
+""";
+
+        var worker = Generate(document, "context.Products", ".ToListAsync()");
+
+        worker.IsContextDiscovery.ShouldBeTrue();
+        worker.SourceText.ShouldContain("Discovery.Find(\"IApplicationDbContext\")");
+        worker.SourceText.ShouldNotContain(WorkerTemplate.ContextInterfacePlaceholder);
+        AssertParsesCleanly(worker);
+    }
+
+    [Fact]
+    public void Discovery_without_an_interface_hint_still_gets_a_valid_empty_literal()
+    {
+        const string document = """
+using Microsoft.EntityFrameworkCore;
+
+namespace Demo;
+
+public class Svc
+{
+    private readonly IUnitOfWork _uow;
+
+    public Task<List<Product>> Go() => this._uow.Context.Products.ToListAsync();
+}
+""";
+
+        var worker = Generate(document, "this._uow.Context.Products", ".ToListAsync()");
+
+        worker.SourceText.ShouldContain("Discovery.Find(\"\")");
+        worker.SourceText.ShouldNotContain(WorkerTemplate.ContextInterfacePlaceholder);
+        AssertParsesCleanly(worker);
+    }
+
+    /// <summary>
+    /// The framework base classes a user context derives from are not peers of it. Excluding open generics and
+    /// framework namespaces is what stops IdentityDbContext`1/`3/`8 being offered as choices.
+    /// </summary>
+    [Fact]
+    public void Discovery_filters_out_open_generics_and_framework_namespaces()
+    {
+        var worker = Generate(
+            """
+using Microsoft.EntityFrameworkCore;
+
+namespace Demo;
+
+public class Svc
+{
+    private readonly IUnitOfWork _uow;
+
+    public Task<List<Product>> Go() => this._uow.Context.Products.ToListAsync();
+}
+""",
+            "this._uow.Context.Products",
+            ".ToListAsync()");
+
+        worker.SourceText.ShouldContain("type.IsGenericTypeDefinition || type.ContainsGenericParameters");
+        worker.SourceText.ShouldContain("IsFrameworkNamespace");
+        worker.SourceText.ShouldContain("ImplementsHint");
+    }
+
     [Fact]
     public void Each_variant_gets_its_own_file_name_so_the_SDK_cache_stays_warm_for_all_of_them()
     {

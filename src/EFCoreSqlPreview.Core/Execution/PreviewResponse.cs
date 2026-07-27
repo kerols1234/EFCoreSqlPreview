@@ -87,6 +87,11 @@ public enum PreviewErrorKind
     /// <summary>The selection was refused before the worker ran.</summary>
     OutOfScope,
 
+    /// <summary>
+    /// A free variable the analyzer could not recover a value for was read while building the query.
+    /// </summary>
+    FreeVariableValueRequired,
+
     /// <summary>Anything else.</summary>
     Unknown,
 }

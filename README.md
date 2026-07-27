@@ -675,7 +675,7 @@ couple of seconds. **Use logging when** you need the definitive SQL a real execu
 Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, how to build and test,
 and how to debug the extension in the Visual Studio experimental instance.
 
-The test suite is **766 tests** — 757 fast unit tests (under a second) plus 9 end-to-end tests that really run
+The test suite is **771 tests** — 762 fast unit tests (under a second) plus 9 end-to-end tests that really run
 `dotnet run --file` against `samples/SampleShop`:
 
 ```powershell

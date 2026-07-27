@@ -225,6 +225,73 @@ public sealed class PreviewRunner : IPreviewRunner
         return attempt;
     }
 
+    /// <summary>
+    /// Rewrites the "could not evaluate a LINQ query parameter" failure into an instruction the user can act on.
+    /// </summary>
+    /// <remarks>
+    /// EF reports a null captured variable as a parameter-evaluation failure whose own message never names the
+    /// variable. The analyzer already knows which ones it had to invent a value for, and that set is almost
+    /// always the cause, so naming them turns a dead end into a one-step fix.
+    /// </remarks>
+    /// <param name="response">The parsed worker response.</param>
+    /// <param name="analysis">The analysis the worker was generated from.</param>
+    /// <param name="request">The request, carrying any values the user has already supplied.</param>
+    /// <returns>The response, with a more useful error when the pattern matches.</returns>
+    private static PreviewResponse ExplainUnsetFreeVariables(
+        PreviewResponse response,
+        QueryAnalysisResult analysis,
+        PreviewRequest request)
+    {
+        if (response.Success || response.Error is not { Length: > 0 } error)
+        {
+            return response;
+        }
+
+        if (error.IndexOf("LINQ query parameter", StringComparison.OrdinalIgnoreCase) < 0
+            && error.IndexOf("NullReferenceException", StringComparison.Ordinal) < 0)
+        {
+            return response;
+        }
+
+        // Only a null can produce this failure, so a variable that got a real substitute - CancellationToken.None,
+        // 0, an empty array - is never the culprit and naming it would send the user to the wrong row.
+        var unset = analysis.FreeVariables
+            .Where(v => v.RequiresUserValue
+                && !request.FreeVariableOverrides.ContainsKey(v.Name)
+                && CanBeNull(v.SuggestedValueExpression))
+            .Select(v => "'" + v.Name + "'")
+            .ToList();
+
+        if (unset.Count == 0)
+        {
+            return response;
+        }
+
+        var names = string.Join(", ", unset);
+        var subject = unset.Count == 1 ? "it has" : "they have";
+        return response with
+        {
+            ErrorKind = PreviewErrorKind.FreeVariableValueRequired,
+            Error = $"The query reads {names} while building its parameters, but {subject} no value the analyzer "
+                + "could recover from the source. Set a value in the free-variables panel and re-run."
+                + Environment.NewLine + Environment.NewLine + error,
+        };
+    }
+
+    /// <summary>
+    /// Whether a synthesized value could be a null reference at runtime.
+    /// </summary>
+    /// <param name="suggestion">The expression the synthesizer chose for the variable.</param>
+    /// <returns><see langword="true"/> for <c>null</c> and the <c>default</c> forms, which is all that can be
+    /// decided without knowing whether the named type is a class or a struct.</returns>
+    private static bool CanBeNull(string? suggestion)
+    {
+        var value = suggestion?.Trim();
+        return string.IsNullOrEmpty(value)
+            || value == "null"
+            || value!.StartsWith("default", StringComparison.Ordinal);
+    }
+
     private async Task<PreviewResult> RunAttemptAsync(
         QueryAnalysisResult analysis,
         ProjectContext project,
@@ -281,6 +348,7 @@ public sealed class PreviewRunner : IPreviewRunner
             run.Canceled);
 
         response = MergeGeneratorWarnings(response, worker.Warnings);
+        response = ExplainUnsetFreeVariables(response, analysis, request);
 
         var diagnostics = DiagnosticRemapper.Parse(run.StandardOutput + "\n" + run.StandardError, worker);
 

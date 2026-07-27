@@ -39,8 +39,8 @@ EFCoreSqlPreview/
 │  ├─ Services/                      Shared session state, captured selection, Win32 clipboard writer.
 │  └─ Settings/                      PreviewSettings, persisted to %LOCALAPPDATA%\EFCoreSqlPreview.
 │
-├─ tests/EFCoreSqlPreview.Core.Tests/   xUnit + Shouldly. 766 tests.
-│  ├─ Analysis/ Projects/ Generation/ Execution/    Fast unit tests (757, under a second).
+├─ tests/EFCoreSqlPreview.Core.Tests/   xUnit + Shouldly. 771 tests.
+│  ├─ Analysis/ Projects/ Generation/ Execution/    Fast unit tests (762, under a second).
 │  └─ EndToEnd/                      9 tests that really run `dotnet run --file` against the sample.
 │
 └─ samples/SampleShop/               net10.0, EF Core 10. The fixture the end-to-end tests build against, and

@@ -47,7 +47,7 @@ about.
 | Presentation | `EFCoreSqlPreview` | `net8.0-windows8.0` | `Microsoft.VisualStudio.Extensibility.Sdk`, Core |
 | Execution | the generated worker | `net10.0` file-based app | the **user's** project, EF Core |
 
-`Core` has **no Visual Studio dependency at all**. That is not tidiness — it is what makes 757 unit tests run
+`Core` has **no Visual Studio dependency at all**. That is not tidiness — it is what makes 762 unit tests run
 in 0.7 seconds without a VS host.
 
 The VSIX is **out-of-process** (VisualStudio.Extensibility). It runs in its own .NET process and talks to VS
@@ -483,7 +483,7 @@ Measured on this repository, .NET SDK 10.0.302, EF Core 10.0.10.
 | --- | --- |
 | `CSharpSyntaxTree.ParseText` on a 236 KB document | ~20 ms |
 | `LinqSelectionAnalyzer.Analyze` with a cached tree | **~0.1 ms** |
-| Fast unit test suite (757 tests) | 0.7 s |
+| Fast unit test suite (762 tests) | 0.7 s |
 | Warm end-to-end run (`dotnet run --file`, unchanged worker) | **2.3 – 3.0 s** |
 | Cold run (restore + build of the user's project) | seconds to minutes; the default timeout is 120 s |
 

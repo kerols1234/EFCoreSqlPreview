@@ -406,6 +406,73 @@ public class Svc
 }
 """;
 
+    /// <summary>A handler whose filter values arrive on an injected request object, as MediatR handlers do.</summary>
+    private const string ParameterDocument = """
+using Microsoft.EntityFrameworkCore;
+
+namespace Demo;
+
+public class Handler
+{
+    private readonly AppDbContext db;
+
+    public async Task<List<Product>> Go(SearchQuery request, CancellationToken cancellationToken)
+    {
+        return await this.db.Products.Where(p => p.CategoryId == request.CategoryId).ToListAsync(cancellationToken);
+    }
+}
+""";
+
+    /// <summary>EF's own wording when a captured variable is null; it never names the variable.</summary>
+    private const string ParameterFailurePayload =
+        """{"success":false,"errorKind":"Unknown","error":"InvalidOperationException: An exception was thrown while attempting to evaluate a LINQ query parameter expression.","commands":[],"warnings":[]}""";
+
+    [Fact]
+    public async Task A_null_captured_variable_is_reported_against_the_variable_the_analyzer_could_not_value()
+    {
+        var process = new FakeProcessRunner().Enqueue(FakeProcessRunner.Ok(Begin + ParameterFailurePayload + End));
+
+        var result = await RunAsync(
+            process,
+            document: ParameterDocument,
+            startsAt: "this.db.Products",
+            endsAfter: ".ToListAsync(cancellationToken)");
+
+        result.Response.ErrorKind.ShouldBe(PreviewErrorKind.FreeVariableValueRequired);
+        result.Response.Error.ShouldNotBeNull();
+        result.Response.Error!.ShouldContain("'request'");
+        result.Response.Error!.ShouldContain("free-variables panel");
+
+        // The original EF wording is kept underneath so the real cause is still visible.
+        result.Response.Error!.ShouldContain("evaluate a LINQ query parameter expression");
+
+        // CancellationToken.None is a real value, so that row is never the one to go and edit.
+        result.Response.Error!.ShouldNotContain("cancellationToken");
+    }
+
+    [Fact]
+    public async Task A_variable_the_user_has_already_supplied_is_not_blamed_for_the_failure()
+    {
+        var process = new FakeProcessRunner().Enqueue(FakeProcessRunner.Ok(Begin + ParameterFailurePayload + End));
+
+        var result = await RunAsync(
+            process,
+            configure: r => r with
+            {
+                FreeVariableOverrides = new Dictionary<string, string>(StringComparer.Ordinal)
+                {
+                    ["request"] = "new SearchQuery(1)",
+                },
+            },
+            document: ParameterDocument,
+            startsAt: "this.db.Products",
+            endsAfter: ".ToListAsync(cancellationToken)");
+
+        result.Response.ErrorKind.ShouldBe(PreviewErrorKind.Unknown);
+        result.Response.Error.ShouldNotBeNull();
+        result.Response.Error!.ShouldNotContain("free-variables panel");
+    }
+
     private static Task<PreviewResult> RunAsync(
         FakeProcessRunner process,
         Func<PreviewRequest, PreviewRequest>? configure = null,

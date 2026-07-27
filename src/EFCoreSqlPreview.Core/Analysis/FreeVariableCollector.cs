@@ -359,9 +359,13 @@ public static class FreeVariableCollector
         }
         else if (!recognised && DefaultValueSynthesizer.LooksLikeEnum(knownType))
         {
+            // Syntax alone cannot tell an enum from a class, and the two fail very differently: an enum's
+            // default is a usable value, a class's is null and throws the moment the query reads a member.
             diagnostics.Add(AnalysisDiagnostic.Info(
                 AnalysisDiagnosticIds.EnumDefaultGuess,
-                $"'{candidate.Name}' looks like an enum; the preview uses its default member.",
+                $"'{candidate.Name}' has no value the analyzer can reproduce, so the preview uses the default for "
+                    + $"'{knownType}'. That is usable for an enum or a struct, but for a class it is null and the "
+                    + "query will fail as soon as it reads a member - set a value in the free-variables panel.",
                 usages.Length > 0 ? usages[0] : declarationSpan));
         }
 

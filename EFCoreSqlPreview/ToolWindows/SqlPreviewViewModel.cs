@@ -815,6 +815,11 @@ namespace EFCoreSqlPreview.ToolWindows
                     + detail,
                 PreviewErrorKind.OutOfScope =>
                     "EF Core SQL Preview handles SELECT (read) queries only." + detail,
+
+                // Core has already named the variables in the message, so repeating them here would only
+                // push the useful part further down the banner.
+                PreviewErrorKind.FreeVariableValueRequired =>
+                    (result.Response.Error ?? "A value is needed before this query can run.") + detail,
                 _ => this.ExplainAnalysisFailure(result) ?? ("The preview did not produce any SQL." + detail),
             };
         }

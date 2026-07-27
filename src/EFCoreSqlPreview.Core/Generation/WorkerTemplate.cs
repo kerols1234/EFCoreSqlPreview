@@ -64,6 +64,16 @@ public static class WorkerTemplate
     /// <summary>Prefix used by the discovery worker to report one candidate context type.</summary>
     public const string ContextCandidatePrefix = "EFSP-CONTEXT-CANDIDATE: ";
 
+    /// <summary>
+    /// Placeholder for the interface the query was written against, or the empty string when there is none.
+    /// </summary>
+    /// <remarks>
+    /// Clean-architecture handlers inject an abstraction such as <c>IApplicationDbContext</c> rather than the
+    /// context itself. That name cannot be activated, but it does identify the context uniquely in almost every
+    /// solution, so discovery uses it to narrow the candidates instead of throwing it away.
+    /// </remarks>
+    public const string ContextInterfacePlaceholder = "{{CONTEXT_INTERFACE}}";
+
     /// <summary>The MSBuild properties every worker needs, one <c>#:property</c> per line.</summary>
     /// <remarks>
     /// <c>PublishAot=false</c> is load-bearing. Nullable and analyzer settings only keep stdout clean, which
@@ -856,7 +866,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 
-var __efspCandidates = Discovery.Find();
+var __efspCandidates = Discovery.Find("{{CONTEXT_INTERFACE}}");
 var __efspReport = new Report
 {
     success = false,
@@ -879,7 +889,7 @@ public static class Discovery
     public const string Begin = "<<<EFSQLPREVIEW-BEGIN>>>";
     public const string End = "<<<EFSQLPREVIEW-END>>>";
 
-    public static List<string> Find()
+    public static List<string> Find(string interfaceHint)
     {
         try
         {
@@ -890,22 +900,66 @@ public static class Discovery
         }
         catch { }
 
-        var results = new List<string>();
+        var matches = new List<Type>();
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies().Where(a => !a.IsDynamic))
         {
             Type[] types;
             try { types = assembly.GetTypes(); } catch { continue; }
             foreach (var type in types)
             {
-                if (type.IsAbstract || !type.IsPublic || !typeof(DbContext).IsAssignableFrom(type)) continue;
-                if (type == typeof(DbContext)) continue;
-                if (type.Namespace != null && type.Namespace.StartsWith("Microsoft.EntityFrameworkCore")) continue;
-                if (!results.Contains(type.FullName)) results.Add(type.FullName);
+                if (!IsActivatableContext(type)) continue;
+                if (!matches.Any(t => t.FullName == type.FullName)) matches.Add(type);
             }
         }
 
+        // An injected abstraction identifies the context far more reliably than "the only one left" does,
+        // so narrowing wins whenever it leaves anything behind.
+        if (!string.IsNullOrEmpty(interfaceHint))
+        {
+            var narrowed = matches.Where(t => ImplementsHint(t, interfaceHint)).ToList();
+            if (narrowed.Count > 0) matches = narrowed;
+        }
+
+        var results = matches.Select(t => t.FullName).ToList();
         results.Sort(StringComparer.Ordinal);
         return results;
+    }
+
+    /// <summary>Whether a type is a context this tool could actually construct and cast a query to.</summary>
+    private static bool IsActivatableContext(Type type)
+    {
+        if (type.IsAbstract || !type.IsPublic || !typeof(DbContext).IsAssignableFrom(type)) return false;
+        if (type == typeof(DbContext)) return false;
+
+        // An open generic such as IdentityDbContext`3 has no closed form to activate, and every framework base
+        // class a user context happens to derive from would otherwise be offered as a peer of that context.
+        if (type.IsGenericTypeDefinition || type.ContainsGenericParameters) return false;
+        return !IsFrameworkNamespace(type.Namespace);
+    }
+
+    private static bool IsFrameworkNamespace(string ns)
+    {
+        if (ns == null) return false;
+        return ns == "Microsoft" || ns == "System"
+            || ns.StartsWith("Microsoft.", StringComparison.Ordinal)
+            || ns.StartsWith("System.", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Matches on the simple name as well as the full name: the analyzer reads the interface off a declaration
+    /// in the user's file, where it is almost always written unqualified.
+    /// </summary>
+    private static bool ImplementsHint(Type type, string hint)
+    {
+        foreach (var contract in type.GetInterfaces())
+        {
+            if (contract.FullName == hint || contract.Name == hint) return true;
+
+            // IApplicationDbContext<T> arrives from the declaration as the mangled `1 form.
+            if (contract.IsGenericType && contract.GetGenericTypeDefinition().Name == hint) return true;
+        }
+
+        return false;
     }
 
     public static void Emit(Report report)

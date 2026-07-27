@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
 using EFCoreSqlPreview.Core.Analysis;
@@ -192,7 +193,7 @@ public sealed class WorkerCodeGenerator : IWorkerCodeGenerator
         var contextTypeName = ResolveContextTypeName(analysis, options);
 
         return contextTypeName is null
-            ? this.GenerateDiscovery(options, descriptor, warnings)
+            ? this.GenerateDiscovery(options, descriptor, warnings, ContextInterfaceHint(analysis))
             : this.GenerateQueryWorker(analysis, options, descriptor, contextTypeName, warnings);
     }
 
@@ -260,11 +261,13 @@ public sealed class WorkerCodeGenerator : IWorkerCodeGenerator
     private GeneratedWorker GenerateDiscovery(
         WorkerGenerationOptions options,
         EfProviderDescriptor descriptor,
-        List<string> warnings)
+        List<string> warnings,
+        string? contextInterface = null)
     {
         var text = NormalizeLineEndings(WorkerTemplate.DiscoverySource
             .Replace(WorkerTemplate.ProjectDirectivesPlaceholder, BuildProjectDirectives(options.Project))
             .Replace(WorkerTemplate.PackageDirectivesPlaceholder, BuildPackageDirectives(options, descriptor, warnings))
+            .Replace(WorkerTemplate.ContextInterfacePlaceholder, EscapeLiteral(contextInterface))
             .Replace(WorkerTemplate.PropertyDirectivesPlaceholder, WorkerTemplate.PropertyDirectives));
 
         var path = System.IO.Path.Combine(options.ScratchDirectory, "discover.cs");
@@ -499,6 +502,43 @@ public sealed class WorkerCodeGenerator : IWorkerCodeGenerator
         // An interface cannot be activated, and typeof(IAppDbContext) would fail the DbContext constraint.
         return analysis.ContextRoot.Confidence == ContextTypeConfidence.DeclaredInterface ? null : resolved!.Trim();
     }
+
+    /// <summary>
+    /// The interface the query was written against, in the reflection spelling, or <see langword="null"/>.
+    /// </summary>
+    /// <remarks>
+    /// Handlers that inject <c>IApplicationDbContext</c> rather than the context itself are the norm in
+    /// clean-architecture solutions. The name cannot be activated, but discovery can use it to pick the one
+    /// context that implements it, which beats asking the user to disambiguate.
+    /// </remarks>
+    private static string? ContextInterfaceHint(QueryAnalysisResult analysis)
+    {
+        if (analysis.ContextRoot.Confidence != ContextTypeConfidence.DeclaredInterface)
+        {
+            return null;
+        }
+
+        var name = analysis.ContextRoot.ResolvedTypeName?.Trim();
+        if (string.IsNullOrEmpty(name))
+        {
+            return null;
+        }
+
+        // Reflection reports IFoo<T> as "IFoo`1", so mirror that spelling rather than the C# one.
+        var generic = name!.IndexOf('<');
+        if (generic < 0)
+        {
+            return name;
+        }
+
+        var arguments = name.Substring(generic);
+        var arity = arguments.Split(',').Length;
+        return name.Substring(0, generic) + "`" + arity.ToString(CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>Renders a value for use inside a double-quoted C# literal in the generated worker.</summary>
+    private static string EscapeLiteral(string? value)
+        => value is null ? string.Empty : value.Replace("\\", "\\\\").Replace("\"", "\\\"");
 
     private static string BuildProjectDirectives(ProjectContext project)
     {

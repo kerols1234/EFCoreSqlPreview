@@ -9,6 +9,29 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 Nothing yet.
 
+## [1.0.1] - 2026-07-28
+
+Fixes found by running 1.0.0 against a real clean-architecture solution.
+
+### Fixed
+
+- **A context reached through an injected interface is now resolved.** Handlers that take
+  `IApplicationDbContext` rather than the context itself — the norm in clean-architecture and MediatR
+  codebases — reported "your project defines more than one DbContext" and produced no SQL. The interface name
+  was being detected and then discarded; it is now passed to context discovery, which picks the one context
+  implementing it.
+- **Framework base classes are no longer offered as context candidates.** A context deriving from
+  `IdentityDbContext<…>` caused every ASP.NET Identity base type to be listed alongside it, including
+  open generics such as ``IdentityDbContext`3``. Discovery now excludes open generic definitions and types in
+  `Microsoft.*` / `System.*` namespaces.
+- **A null captured variable now says which variable to fix.** EF reports it as "an exception was thrown while
+  attempting to evaluate a LINQ query parameter expression" without naming anything. The error now names the
+  variables the analyzer could not recover a value for and points at the free-variables panel, keeping EF's
+  original wording underneath. Variables given a real substitute — `CancellationToken.None`, `0`, an empty
+  array — are never blamed, because a null is the only thing that can cause this.
+- **A class is no longer described as an enum.** Syntax alone cannot tell them apart, so the diagnostic now
+  explains what the substituted default actually means for each, rather than asserting the wrong one.
+
 ## [1.0.0] - 2026-07-27
 
 Initial release.
@@ -63,7 +86,7 @@ Initial release.
   `DotnetPath`, `ProviderOverride`, `VerboseMode`.
 - **`samples/SampleShop`** — a net10.0 EF Core 10 fixture with owned types, value-converted collections,
   two-way navigations, a design-time factory, custom queryable extensions and seven ready-to-select queries.
-- **766 tests**: 757 fast unit tests plus 9 end-to-end tests that really run `dotnet run --file` against the
+- **771 tests**: 762 fast unit tests plus 9 end-to-end tests that really run `dotnet run --file` against the
   sample and assert on the SQL that comes back.
 
 ### Known limitations
